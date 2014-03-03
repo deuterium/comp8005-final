@@ -19,3 +19,4 @@ doc/
 
 # program logs
 *_log*
+*.conf

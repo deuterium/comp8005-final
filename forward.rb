@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 =begin
 -------------------------------------------------------------------------------------
---  SOURCE FILE:    forward.rb - A multi-threaded echo server
+--  SOURCE FILE:    forward.rb - A multi-threaded simple port forwarding application
 --
 --  PROGRAM:        forward
 --                ./forward.rb 
@@ -24,11 +24,15 @@
 require 'socket'
 require 'thread'
 require 'ipaddr'
+require_relative 'forwardpair'
 
 
 ## Variables
-
+lock = Mutex.new
 CONFIG_FILE = "forward.conf"
+
+# String constants
+USAGE = "Proper usage: ./forward.rb"
 CONFIG_FILE_HEADER = ">> foward.rb Configuration File. first three lines are ignored\n"
 CONFIG_FILE_HEADER << ">> Please list external port and ip address to be forwarded. one per line\n"
 CONFIG_FILE_HEADER << ">> ie. 80>173.194.33.0"
@@ -90,8 +94,7 @@ end
 ## Main
 
 if ARGV.count > 1
-    puts "Proper usage: ./forward.rb"
-    exit
+    exit_reason(USAGE)
 end
 
 # clear for STDIN, if applicable
