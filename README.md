@@ -1,9 +1,6 @@
 comp8005-final
 ================
 
-Application to compare the scalability and performance of the select-, multi-threaded-, and epoll- based client-server implementations.
-
-
 Objective:
 - To design and develop a network application that uses advanced TCP/IP programming techniques.
 - To design and implement a minimum-functionality “Port Forwarder” using any language of your choice.
