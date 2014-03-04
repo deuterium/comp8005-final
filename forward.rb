@@ -23,7 +23,7 @@
 
 require 'socket'
 require 'thread'
-require 'ipaddr'
+require 'ipaddress'
 require_relative 'forwardpair'
 
 
@@ -61,27 +61,19 @@ def config_check
             3.times do # strip conf header
                 conf.shift
             end
-            pair = nil
             conf.each do |l|
                 if !l.include? '>' # check each line for proper form
                     exit_reason(CONFIG_INVALID)
                 else # check first of pair valid port and second valid ip
                     pair = l.split('>') 
-                    puts pair[0].to_i
-                    if pair[0].to_i < 1 || pair[0].to_i > 65535
-                        exit_reason(CONFIG_INVALID)
-                    end
-                    begin
-                        # used to capture ip address format
-                        # IPv4 or IPv6
-                        # doesn't catch 999.999.999.999 though...
-                        # could use gem ipaddress, but want to stay away from gems
-                        IPAddr.new(pair[1])
-                    rescue ArgumentError
+                    port = pair[0].to_i
+                    ip = pair[1]
+                    if port < 1 || port > 65535 || !IPAddress::valid?(ip)
                         exit_reason(CONFIG_INVALID)
                     end
                 end
             end
+            puts conf
         end 
     end
 end
