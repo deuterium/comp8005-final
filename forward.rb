@@ -33,48 +33,58 @@ CONFIG_FILE = "forward.conf"
 
 # String constants
 USAGE = "Proper usage: ./forward.rb"
-CONFIG_FILE_HEADER = ">> foward.rb Configuration File. first three lines are ignored\n"
+CONFIG_FILE_HEADER = ">> forward.rb Configuration File. first three lines are ignored\n"
 CONFIG_FILE_HEADER << ">> Please list external port and ip address to be forwarded. one per line\n"
-CONFIG_FILE_HEADER << ">> ie. 80>173.194.33.0"
+CONFIG_FILE_HEADER << ">> ie. 80>173.194.33.0:8080"
 CONFIG_EDIT = "Please edit #{CONFIG_FILE} and relaunch."
 CONFIG_CREATE = "Configuration file created. #{CONFIG_EDIT}"
 CONFIG_EMPTY = "Configuration file empty. #{CONFIG_EDIT}"
 CONFIG_INVALID = "Error parsing configuration. #{CONFIG_EDIT}"
+VALID_LINE_REGEX = Regexp.new('^\d{1,5}(>)(?:[0-9]{1,3}\.){3}[0-9]{1,3}:\d{1,5}$')
 
-## Funtions 
+## Functions
 
-def config_check
-    # check if config file exists
-    if !File.exists? CONFIG_FILE
-        File.open(CONFIG_FILE, 'a') { |f|
-            f.write(CONFIG_FILE_HEADER)
-        }
-        exit_reason(CONFIG_CREATE)
-    else # check if config file empty & valid
+def config_load
+    if File.exists? CONFIG_FILE #file exists
         conf = nil
-        File.open(CONFIG_FILE, 'r') { |f|
+        File.open(CONFIG_FILE, 'r') do |f|
             conf = f.readlines
-        }
-        if conf.count <= 3 # empty config
+        end
+        if conf.count <= 3 # config empty
             exit_reason(CONFIG_EMPTY)
-        else # check configuration valid
+        else # config empty, needs validation
             3.times do # strip conf header
                 conf.shift
             end
+            conf_items = Array.new()
             conf.each do |l|
-                if !l.include? '>' # check each line for proper form
-                    exit_reason(CONFIG_INVALID)
-                else # check first of pair valid port and second valid ip
-                    pair = l.split('>') 
-                    port = pair[0].to_i
-                    ip = pair[1]
-                    if port < 1 || port > 65535 || !IPAddress::valid?(ip)
-                        exit_reason(CONFIG_INVALID)
+                if VALID_LINE_REGEX.match(l)
+                    items = l.split('>')
+                    addr = items[1].split(':')
+                    ip = addr[0]
+                    port = addr[1].to_i
+                    if !valid_port(port) && !IPAddress::valid?(ip)
+                        exit_reason("1#{CONFIG_INVALID}")
                     end
+                    conf_items.push(items[0], items[1])
+                else #regex fails
+                    exit_reason("2#{CONFIG_INVALID}")
                 end
             end
-            puts conf
-        end 
+
+        end
+        #do things with valid config here
+        return conf_items
+    else #file does not exist
+        File.open(CONFIG_FILE, 'a') do |f|
+            f.write(CONFIG_FILE_HEADER)
+        end
+        exit_reason(CONFIG_CREATE)
+    end
+end
+
+def valid_port(num)
+    if num >= 1 && num <= 65535
     end
 end
 
@@ -84,7 +94,6 @@ def exit_reason(reason)
 end
 
 ## Main
-
 if ARGV.count > 1
     exit_reason(USAGE)
 end
@@ -92,4 +101,5 @@ end
 # clear for STDIN, if applicable
 ARGV.clear
 
-config_check
+conf = config_load
+puts conf
