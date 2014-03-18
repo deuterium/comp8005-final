@@ -66,7 +66,7 @@ def config_load
                     if !valid_port(port) && !IPAddress::valid?(ip)
                         exit_reason("1#{CONFIG_INVALID}")
                     end
-                    conf_items.push(items[0], items[1])
+                    conf_items.push("#{items[0]},#{addr[0]},#{addr[1]}")
                 else #regex fails
                     exit_reason("2#{CONFIG_INVALID}")
                 end
@@ -93,6 +93,22 @@ def exit_reason(reason)
     exit
 end
 
+def start_listen(listen_port, forward_addr, forward_port)
+    begin
+        server = TCPServer.new(listen_port)
+    rescue => e
+        puts "problem binding listening server"
+    end
+    puts "Server: Incoming port #{listen_port} bound to forward to #{forward_addr}:#{forward_port}"
+    loop {
+        Thread.start(server.accept) { |c|
+            sock_domain, remote_port,
+                    remote_hostname, remote_ip = c.peeraddr
+
+        }
+    }
+end
+
 ## Main
 if ARGV.count > 1
     exit_reason(USAGE)
@@ -102,4 +118,15 @@ end
 ARGV.clear
 
 conf = config_load
-puts conf
+# keep track of listening servers
+listening_processes = (0..conf.count-1).map do |p|
+    Process.fork do
+        forward_item = conf[p].split(',')
+        start_listen(forward_item[0], forward_item[1], forward_item[2].chomp!)
+    end
+end
+
+#main program will not end until listening processes are finished
+listening_processes.each {|p| Process.wait p}
+
+puts "ended program"
