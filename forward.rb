@@ -6,7 +6,7 @@
 --  PROGRAM:        forward
 --                ./forward.rb 
 --
---  FUNCTIONS:      Ruby Threads, Ruby Sockets
+--  FUNCTIONS:      Ruby Threads, Ruby Sockets, UNIX Processes, IPAddress gem
 --
 --  DATE:           March 3, 2014
 --
@@ -24,7 +24,6 @@
 require 'socket'
 require 'thread'
 require 'ipaddress'
-require_relative 'forwardpair'
 
 
 ## Variables
@@ -98,15 +97,39 @@ def start_listen(listen_port, forward_addr, forward_port)
         server = TCPServer.new(listen_port)
     rescue => e
         puts "problem binding listening server"
+        puts e
+        exit!
     end
     puts "Server: Incoming port #{listen_port} bound to forward to #{forward_addr}:#{forward_port}"
-    loop {
-        Thread.start(server.accept) { |c|
-            sock_domain, remote_port,
-                    remote_hostname, remote_ip = c.peeraddr
-
+    begin
+        loop {
+            Thread.start(server.accept) { |c|
+                sock_domain, remote_port,
+                        remote_hostname, remote_ip = c.peeraddr
+                puts "connecting accepted: #{remote_ip}:#{remote_port}"
+                # forward and receive data to client
+                remote = TCPSocket.new(forward_addr, forward_port)
+                remote
+                loop {
+                    data_remote_in = c.readlines(2048)
+                    if data_remote_in != nil
+                        remote.puts(data_remote_in)
+                        data_remote_in = nil
+                    end
+                    data_forward_in = remote.readlines(2048)
+                    if data_forward_in != nil
+                        c.puts(data_forward_in)
+                        data_forward_in = nil
+                    end
+                }
+            }
         }
-    }
+    rescue Interrupt
+        puts "server shutdown received...."
+        exit!
+    #rescue => e
+     #   puts "other error: #{e}"
+    end
 end
 
 ## Main
