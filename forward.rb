@@ -114,38 +114,56 @@ def start_listen(listen_port, forward_addr, forward_port)
 
                     max_i = 262140
 
-                    data_remote_in = c.recvfrom(max_i)
+=begin
+                    data_remote_in = c.recv(max_i)
                     if !data_remote_in.empty?
                         puts "TO FORWARD: #{data_remote_in.to_s.bytesize} =+ #{data_remote_in}"
                         remote.puts(data_remote_in)
                         data_remote_in = Array.new()
                     end
-                    data_forward_in = remote.recvfrom(max_i)
+                    data_forward_in = remote.recv(max_i)
                     if !data_forward_in.empty?
                         puts "FROM FORWARD: #{data_forward_in.to_s.bytesize} =+ #{data_forward_in}"
                         c.puts(data_forward_in)
                         data_forward_in = Array.new()
                     end
-
-=begin
-                    begin
-                        data_remote_in = c.recvfrom_nonblock(max_i)
-                    rescue IO::WaitReadable, Errno::EWOULDBLOCK, Errno::EAGAIN
-                        IO.select([c])
-                        retry
-                    end
-                    puts data_remote_in
-                    remote.puts(data_remote_in)
-
-                    begin
-                        data_forward_in = remote.recvfrom_nonblock(max_i)
-                    rescue IO::WaitReadable, Errno::EWOULDBLOCK, Errno::EAGAIN
-                        IO.select([remote])
-                        retry
-                    end
-                    puts data_forward_in
-                    c.puts(data_forward_in)
 =end
+                    Thread.new() do
+                        loop {
+                            begin
+                                data_remote_in = c.recv_nonblock(max_i)
+                            rescue IO::WaitReadable, Errno::EWOULDBLOCK, Errno::EAGAIN
+                                IO.select([c])
+                                retry
+                            end
+                            if data_remote_in.empty? then
+                                nil
+                            else
+                                puts data_remote_in
+                                remote.puts(data_remote_in)
+                            end
+                            data_remote_in.flush
+                        }
+                    end
+                    Thread.new() do
+                        loop {
+                            begin
+                                data_forward_in = remote.recv_nonblock(max_i)
+                            rescue IO::WaitReadable, Errno::EWOULDBLOCK, Errno::EAGAIN
+                                IO.select([remote])
+                                retry
+                            end
+                            if data_forward_in.empty? then
+                                nil
+                            else
+                                puts data_forward_in
+                                c.puts(data_forward_in)
+                            end
+                            data_forward_in.flush
+                        }
+                    end
+
+
                 }
             }
         }
