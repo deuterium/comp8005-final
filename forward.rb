@@ -111,21 +111,45 @@ def start_listen(listen_port, forward_addr, forward_port)
                 remote = TCPSocket.new(forward_addr, forward_port)
                 remote
                 loop {
-                    data_remote_in = c.readlines(2048)
-                    if data_remote_in != nil
+
+                    max_i = 262140
+
+                    data_remote_in = c.recvfrom(max_i)
+                    if !data_remote_in.empty?
+                        puts "TO FORWARD: #{data_remote_in.to_s.bytesize} =+ #{data_remote_in}"
                         remote.puts(data_remote_in)
-                        data_remote_in = nil
+                        data_remote_in = Array.new()
                     end
-                    data_forward_in = remote.readlines(2048)
-                    if data_forward_in != nil
+                    data_forward_in = remote.recvfrom(max_i)
+                    if !data_forward_in.empty?
+                        puts "FROM FORWARD: #{data_forward_in.to_s.bytesize} =+ #{data_forward_in}"
                         c.puts(data_forward_in)
-                        data_forward_in = nil
+                        data_forward_in = Array.new()
                     end
+
+=begin
+                    begin
+                        data_remote_in = c.recvfrom_nonblock(max_i)
+                    rescue IO::WaitReadable, Errno::EWOULDBLOCK, Errno::EAGAIN
+                        IO.select([c])
+                        retry
+                    end
+                    puts data_remote_in
+                    remote.puts(data_remote_in)
+
+                    begin
+                        data_forward_in = remote.recvfrom_nonblock(max_i)
+                    rescue IO::WaitReadable, Errno::EWOULDBLOCK, Errno::EAGAIN
+                        IO.select([remote])
+                        retry
+                    end
+                    puts data_forward_in
+                    c.puts(data_forward_in)
+=end
                 }
             }
         }
-    rescue Interrupt
-        puts "server shutdown received...."
+    rescue Interrupt # child process
         exit!
     #rescue => e
      #   puts "other error: #{e}"
@@ -145,11 +169,15 @@ conf = config_load
 listening_processes = (0..conf.count-1).map do |p|
     Process.fork do
         forward_item = conf[p].split(',')
-        start_listen(forward_item[0], forward_item[1], forward_item[2].chomp!)
+        start_listen(forward_item[0], forward_item[1], forward_item[2].chomp)
     end
 end
 
-#main program will not end until listening processes are finished
-listening_processes.each {|p| Process.wait p}
-
-puts "ended program"
+# main program will not end until listening processes are finished
+begin
+    listening_processes.each {|p| Process.wait p}
+rescue Interrupt #parent process
+    puts "server shutdown received...."
+    listening_processes.each {|p| Process.kill "KILL", p} #kill children
+    exit!
+end
